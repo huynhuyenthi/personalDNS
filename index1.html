@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Daily · Personal note</title>
+<meta name="description" content="Write your own daily note, tick tasks done or blocked, and copy one standard markdown block." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 213 247'><path fill='%23fcb017' d='M106.4,0L0,61.7v123.4l106.4,61.7,106.4-61.7V61.7L106.4,0ZM106.3,22.6l81.5,47.3-81.5,47.3L24.9,69.9,106.3,22.6ZM192.5,172.4l-86.1,50.1-86.1-49.6v-29.5l86.1,49.6,86.1-50.1v29.5ZM192.5,119.7l-86.1,50.1L20.3,119.7v-29.5l86.2,50.1,86.1-50.1v29.5Z'/></svg>">
+<style>
+  :root{
+    --ink:#0C111D; --ink-2:#111827;
+    --panel:#141C2E; --panel-2:#182136;
+    --line:#26344E; --line-soft:#1D293F;
+    --text:#DCE5F5; --text-dim:#9BAAC6; --muted:#6C7E9C;
+    --sync:#4CE0C0; --pulse:#F2A65A; --edge:#7C93FF; --danger:#FF7B72;
+    --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans:"IBM Plex Sans", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --r:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(900px 500px at 88% -10%, rgba(124,147,255,.16), transparent 60%),
+      radial-gradient(700px 420px at 4% 8%, rgba(76,224,192,.10), transparent 62%),
+      var(--ink);
+    color:var(--text); font-family:var(--sans); font-size:15px; line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:
+      linear-gradient(rgba(124,147,255,.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,147,255,.045) 1px, transparent 1px);
+    background-size:52px 52px;
+    mask-image:radial-gradient(1200px 700px at 50% 0%, #000 20%, transparent 85%);
+  }
+  .wrap{position:relative; z-index:1; max-width:1560px; margin:0 auto; padding:22px 22px 60px}
+
+  /* ---------- header ---------- */
+  .top{
+    display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between;
+    padding-bottom:18px; margin-bottom:18px; border-bottom:1px solid var(--line-soft);
+  }
+  .brand{display:flex; align-items:center; gap:13px; min-width:0}
+  .logo{height:29px; width:auto; flex:none; display:block}
+  .brand-rule{width:1px; height:36px; background:var(--line); flex:none; margin:0 3px}
+  .brand h1{margin:0; font-family:var(--mono); font-size:17px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; white-space:nowrap}
+  .brand h1 span{color:var(--sync)}
+  .brand p{margin:1px 0 0; font-size:12.5px; color:var(--muted); letter-spacing:.02em}
+
+  .top-fields{display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end}
+  .field{display:flex; flex-direction:column; gap:5px}
+  .field label{font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
+  input[type="text"], input[type="date"], textarea{
+    background:var(--ink-2); color:var(--text); border:1px solid var(--line); border-radius:8px;
+    padding:9px 11px; font-family:var(--mono); font-size:13px; outline:none;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input[type="text"]:focus, input[type="date"]:focus, textarea:focus{border-color:var(--edge); box-shadow:0 0 0 3px rgba(124,147,255,.16)}
+  input[type="date"]{color-scheme:dark}
+  #name{width:150px}
+
+  /* ---------- layout ---------- */
+  .grid{display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr) minmax(0,1fr); gap:18px; align-items:start}
+  .col{display:flex; flex-direction:column; gap:18px; min-width:0}
+  @media (min-width:1181px){
+    .col, #panelOutput, #panelList{height:clamp(520px, calc(100vh - 196px), 1000px)}
+    .col .panel{flex:1; min-height:0; display:flex}
+    .col .panel.obs{flex:0 0 auto}
+    .col .panel textarea{flex:1; min-height:0}
+    #panelOutput .out-wrap, #panelList .list-wrap{flex:1; min-height:0; max-height:none}
+  }
+  @media (max-width:1180px){
+    .grid{display:flex; flex-direction:column}
+  }
+  @media (max-width:640px){
+    .wrap{padding:16px 14px 40px}
+    .brand h1{white-space:normal; font-size:15px}
+    .top-fields{width:100%}
+    .field{flex:1 1 140px}
+    .field input{width:100% !important}
+    .panel-head{flex-wrap:wrap}
+    .panel-head .btn-row{width:100%}
+    .panel-head .btn-row .btn{flex:1}
+  }
+
+  .panel{
+    background:linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+    border:1px solid var(--line-soft); border-radius:var(--r);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .panel-head{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:12px 14px; border-bottom:1px solid var(--line-soft); background:rgba(0,0,0,.16);
+  }
+  .panel-head h2{
+    margin:0; font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--text-dim); display:flex; align-items:center; gap:9px;
+  }
+  .panel-head h2::before{content:""; width:9px; height:10px; background:var(--edge); flex:none; clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)}
+  .panel-head .count{font-family:var(--mono); font-size:11px; color:var(--muted)}
+
+  textarea.editor{
+    width:100%; min-height:150px; resize:vertical; border:0; border-radius:0;
+    background:transparent; padding:14px; line-height:1.75; font-size:13px; tab-size:4;
+  }
+  textarea.editor:focus{box-shadow:none}
+  textarea.editor::placeholder{color:#4B5C7A}
+  #yesterday{min-height:200px}
+  #today{min-height:220px}
+  #obstacles{min-height:96px}
+
+  /* ---------- checklist (signature) ---------- */
+  .list-wrap{overflow:auto; max-height:640px}
+  .sec-title{
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--muted); padding:12px 14px 4px;
+  }
+  .rows{list-style:none; margin:0; padding:2px 0 8px}
+  .row{display:flex; align-items:flex-start; gap:10px; padding:5px 14px; transition:background .15s}
+  .row:hover{background:rgba(124,147,255,.06)}
+  .tile-btn{
+    appearance:none; border:0; background:transparent; padding:0; cursor:pointer; flex:none;
+    width:22px; height:24px; display:grid; place-items:center; margin-top:1px; border-radius:6px;
+  }
+  .tile-btn:focus-visible{outline:2px solid var(--edge); outline-offset:2px}
+  .tile{
+    width:15px; height:17px; clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+    background:var(--line); transition:background .15s, box-shadow .15s;
+  }
+  .row .txt{flex:1; min-width:0; font-family:var(--mono); font-size:12.5px; line-height:1.7; color:var(--text-dim); word-break:break-word}
+  .row .st{font-family:var(--mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); flex:none; margin-top:4px}
+  .row.done .tile{background:var(--sync); box-shadow:0 0 12px rgba(76,224,192,.45)}
+  .row.done .txt{color:var(--muted); text-decoration:line-through; text-decoration-color:rgba(76,224,192,.5)}
+  .row.done .st{color:var(--sync)}
+  .row.blocked .tile{background:var(--pulse); box-shadow:0 0 12px rgba(242,166,90,.45)}
+  .row.blocked .txt{color:var(--text)}
+  .row.blocked .st{color:var(--pulse)}
+  .row.plain .tile-btn{visibility:hidden}
+  .row.plain .txt{color:var(--muted)}
+  .empty{padding:26px 18px; text-align:center; color:var(--muted); font-size:13px}
+  .empty strong{display:block; color:var(--text-dim); font-family:var(--mono); font-size:12px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:8px}
+  .empty code{font-family:var(--mono); color:var(--sync); font-size:12px}
+
+  .list-foot{padding:10px 14px; border-top:1px solid var(--line-soft); display:flex; gap:14px; flex-wrap:wrap}
+  .stat{display:flex; align-items:center; gap:7px; font-family:var(--mono); font-size:11.5px; color:var(--muted)}
+  .stat b{color:var(--text-dim); font-weight:500}
+  .stat .dot{width:9px; height:10px; clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); background:var(--line)}
+  .stat .dot.done{background:var(--sync)} .stat .dot.blocked{background:var(--pulse)}
+
+  /* ---------- options / history ---------- */
+  details.opts{border-top:1px solid var(--line-soft)}
+  details.opts > summary{
+    list-style:none; cursor:pointer; padding:11px 14px; font-family:var(--mono); font-size:10.5px;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--muted);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  details.opts > summary::-webkit-details-marker{display:none}
+  details.opts > summary:hover{color:var(--text-dim)}
+  details.opts > summary::after{content:"+"; font-size:14px; line-height:1}
+  details.opts[open] > summary::after{content:"−"}
+  .opts-body{padding:2px 14px 14px}
+  .check{display:flex; gap:10px; align-items:flex-start; padding:7px 0; cursor:pointer; font-size:13px; color:var(--text-dim)}
+  .check input{
+    appearance:none; width:16px; height:16px; flex:none; margin-top:2px; border:1px solid var(--line);
+    border-radius:4px; background:var(--ink-2); cursor:pointer; transition:background .15s, border-color .15s;
+  }
+  .check input:checked{background:var(--sync); border-color:var(--sync)}
+  .check input:checked::after{content:"✓"; display:block; color:#06251E; font-size:12px; font-weight:700; text-align:center; line-height:14px}
+  .check input:focus-visible{outline:2px solid var(--edge); outline-offset:2px}
+  .hist{list-style:none; margin:0; padding:0}
+  .hist li{display:flex; align-items:center; gap:10px; padding:6px 0; font-family:var(--mono); font-size:12px; color:var(--text-dim); border-top:1px solid var(--line-soft)}
+  .hist li:first-child{border-top:0}
+  .hist .d{flex:1}
+  .hist .btn{padding:5px 9px; font-size:10px}
+  .hint{font-size:11.5px; color:var(--muted); margin:8px 0 0; line-height:1.5}
+
+  /* ---------- output ---------- */
+  .out-wrap{position:relative; max-height:640px; overflow:auto}
+  pre#output{margin:0; padding:14px; font-family:var(--mono); font-size:12.5px; line-height:1.75; white-space:pre-wrap; word-break:break-word; color:var(--text-dim)}
+  #output .h1{color:#fff; font-weight:600}
+  #output .h2{color:var(--edge); font-weight:600}
+  #output .box{color:var(--edge)}
+  #output .done{color:var(--sync)}
+  #output .blk{color:var(--pulse)}
+  #output .tag{color:var(--pulse)}
+  #output .code{color:#8FE0FF; background:rgba(143,224,255,.09); padding:0 4px; border-radius:4px}
+  #output .b{color:var(--text); font-weight:600}
+  #output .i{color:var(--muted); font-style:italic}
+  #output .na{color:var(--muted)}
+
+  /* ---------- buttons ---------- */
+  .btn{
+    font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    background:var(--ink-2); color:var(--text-dim); border:1px solid var(--line);
+    padding:8px 13px; border-radius:7px; cursor:pointer;
+    transition:color .15s, border-color .15s, background .15s, transform .1s;
+  }
+  .btn:hover{color:var(--text); border-color:var(--edge)}
+  .btn:active{transform:translateY(1px)}
+  .btn:focus-visible{outline:2px solid var(--edge); outline-offset:2px}
+  .btn.accent{border-color:var(--edge); color:var(--edge)}
+  .btn.accent:hover{background:rgba(124,147,255,.12); color:#fff}
+  .btn.primary{background:var(--sync); border-color:var(--sync); color:#06251E; font-weight:600}
+  .btn.primary:hover{background:#69EACE; color:#06251E}
+  .btn.ok{background:var(--sync); border-color:var(--sync); color:#06251E}
+  .btn-row{display:flex; gap:8px; flex-wrap:wrap}
+  #panelOutput{transition:border-color .25s, box-shadow .25s}
+  #panelOutput.flash{border-color:var(--sync); box-shadow:0 0 0 2px rgba(76,224,192,.22)}
+
+  .warn{margin:0; padding:10px 14px; border-top:1px solid var(--line-soft); background:rgba(242,166,90,.08); color:var(--pulse); font-family:var(--mono); font-size:11.5px; line-height:1.6}
+  .warn.hidden{display:none}
+
+  footer{
+    margin-top:26px; padding-top:14px; border-top:1px solid var(--line-soft);
+    font-family:var(--mono); font-size:11px; color:var(--muted);
+    display:flex; flex-wrap:wrap; gap:8px 18px; justify-content:space-between;
+  }
+  kbd{font-family:var(--mono); font-size:10.5px; background:var(--ink-2); border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; padding:1px 5px; color:var(--text-dim)}
+  @media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 213 247" fill="#fcb017" role="img" aria-label="Hexa"><path d="M106.4,0L0,61.7v123.4l106.4,61.7,106.4-61.7V61.7L106.4,0ZM106.3,22.6l81.5,47.3-81.5,47.3L24.9,69.9,106.3,22.6ZM192.5,172.4l-86.1,50.1-86.1-49.6v-29.5l86.1,49.6,86.1-50.1v29.5ZM192.5,119.7l-86.1,50.1L20.3,119.7v-29.5l86.2,50.1,86.1-50.1v29.5Z"/></svg>
+      <span class="brand-rule" aria-hidden="true"></span>
+      <div>
+        <h1>Daily <span>· Personal</span></h1>
+        <p>Write your note, tick what&rsquo;s done or blocked, copy one markdown block.</p>
+      </div>
+    </div>
+
+    <div class="top-fields">
+      <div class="field">
+        <label for="name">Name</label>
+        <input type="text" id="name" value="Thi" spellcheck="false" />
+      </div>
+      <div class="field">
+        <label for="date">Date</label>
+        <input type="date" id="date" />
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn accent" id="btnNext" type="button" title="Move TODAY into YESTERDAY, carry unfinished tasks, advance the date">Start next day</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- ======= EDITORS ======= -->
+    <div class="col">
+      <section class="panel" aria-label="Yesterday">
+        <div class="panel-head">
+          <h2>Yesterday</h2>
+          <span class="count" id="cntY">0</span>
+        </div>
+        <textarea class="editor" id="yesterday" spellcheck="false" placeholder="- Meet with Tri Nguyen to catch up Sapo Metrics&#10;    - Test alert flow on Zalo OA&#10;&#10;Tab / Shift+Tab to indent. No need to type [] — it is added for you."></textarea>
+      </section>
+
+      <section class="panel" aria-label="Today">
+        <div class="panel-head">
+          <h2>Today</h2>
+          <div class="btn-row">
+            <button class="btn" id="btnSample" type="button">Sample</button>
+            <button class="btn" id="btnClearToday" type="button">Clear</button>
+          </div>
+        </div>
+        <textarea class="editor" id="today" spellcheck="false" placeholder="- Review HexaSync GTM Strategy Documents&#10;    - Verify research and reports in GG Drive&#10;        - GTM: Sapo Customer Portfolio analysis"></textarea>
+      </section>
+
+      <section class="panel obs" aria-label="Obstacles">
+        <div class="panel-head">
+          <h2>Obstacles</h2>
+          <span class="count" id="cntO">N/A</span>
+        </div>
+        <textarea class="editor" id="obstacles" spellcheck="false" placeholder="Leave empty = N/A"></textarea>
+      </section>
+    </div>
+
+    <!-- ======= CHECKLIST ======= -->
+    <section class="panel" id="panelList" aria-label="Checklist">
+      <div class="panel-head">
+        <h2>Checklist</h2>
+        <span class="count">click a tile to cycle: open → done → blocked</span>
+      </div>
+      <div class="list-wrap" id="list"></div>
+      <div class="list-foot">
+        <span class="stat"><span class="dot"></span>Open <b id="stOpen">0</b></span>
+        <span class="stat"><span class="dot done"></span>Done <b id="stDone">0</b></span>
+        <span class="stat"><span class="dot blocked"></span>Blocked <b id="stBlk">0</b></span>
+      </div>
+
+      <details class="opts">
+        <summary>Options</summary>
+        <div class="opts-body">
+          <label class="check"><input type="checkbox" id="optCarry" checked><span>&ldquo;Start next day&rdquo; carries unfinished tasks into the new TODAY</span></label>
+          <label class="check"><input type="checkbox" id="optKeepObs" checked><span>&ldquo;Start next day&rdquo; keeps the Obstacles list</span></label>
+          <label class="check"><input type="checkbox" id="optObsBox" checked><span>Add <code>[]</code> to obstacle lines too</span></label>
+        </div>
+      </details>
+
+      <details class="opts">
+        <summary>Past days</summary>
+        <div class="opts-body">
+          <ul class="hist" id="hist"></ul>
+          <p class="hint" id="histHint">Each &ldquo;Start next day&rdquo; saves the finished note here (last 60 days, in this browser only).</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- ======= OUTPUT ======= -->
+    <section class="panel" id="panelOutput" aria-label="Standard output">
+      <div class="panel-head">
+        <h2>Standard output</h2>
+        <div class="btn-row">
+          <button class="btn" id="btnDownload" type="button">Download .md</button>
+          <button class="btn primary" id="btnCopy" type="button">Copy</button>
+        </div>
+      </div>
+      <div class="out-wrap"><pre id="output"></pre></div>
+      <p class="warn hidden" id="warn"></p>
+    </section>
+
+  </div>
+
+  <footer>
+    <span>Runs entirely in your browser &mdash; your note is saved to this browser only.</span>
+    <span><kbd>Tab</kbd> to indent &middot; <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to copy</span>
+  </footer>
+</div>
+
+<script>
+/* CORE:START - pure logic, no DOM access */
+
+var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+var STATES = ["open", "done", "blocked"];
+var BOX = { open:"[]", done:"[X]", blocked:"[!]" };
+
+function formatDate(iso){
+  var p = String(iso || "").split("-");
+  if (p.length !== 3) return iso || "";
+  var m = parseInt(p[1], 10);
+  if (!MONTHS[m - 1]) return iso;
+  return MONTHS[m - 1] + " " + String(p[2]).padStart(2, "0") + ", " + p[0];
+}
+
+function addDays(iso, n){
+  var p = String(iso || "").split("-");
+  if (p.length !== 3) return iso;
+  var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + n));
+  return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0") + "-" + String(d.getUTCDate()).padStart(2, "0");
+}
+
+/* One raw line -> its parts. Bullets and boxes are optional in the editor. */
+function parseLine(raw){
+  var s = String(raw).replace(/\t/g, "    ");
+  var m = s.match(/^( *)([-*+]\s*)?(?:\[\s*([xX!])?\s*\]\s*)?(.*)$/);
+  var state = "open";
+  if (m[3] === "!") state = "blocked";
+  else if (m[3]) state = "done";
+  var hasBox = /^ *([-*+]\s*)?\[\s*[xX!]?\s*\]/.test(s);
+  return { indent: m[1].length, marker: m[2] || "", state: state, hasBox: hasBox, text: m[4].replace(/\s+$/, "") };
+}
+
+/* Editor text -> list of items with a nesting level (stack of indents, like the team formatter) */
+function parseSection(text){
+  var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+  var items = [], stack = [];
+  for (var i = 0; i < lines.length; i++){
+    if (!lines[i].trim()) continue;
+    var p = parseLine(lines[i]);
+    while (stack.length && p.indent < stack[stack.length - 1]) stack.pop();
+    if (!stack.length) stack.push(p.indent);
+    else if (p.indent > stack[stack.length - 1]) stack.push(p.indent);
+    var plain = /^N\/A$/i.test(p.text);
+    items.push({ line: i, level: stack.length - 1, state: p.state, text: p.text, plain: plain });
+  }
+  return items;
+}
+
+/* Items -> standard markdown lines: 4 spaces per level, "-" and "+" alternate, every bullet gets a box */
+function formatItems(items, opts){
+  opts = opts || {};
+  return items.map(function(it){
+    var pad = new Array(it.level + 1).join("    ");
+    var marker = (it.level % 2 === 0) ? "- " : "+ ";
+    if (it.plain || opts.noBox) return pad + marker + it.text;
+    return pad + marker + BOX[it.state] + (it.text ? " " + it.text : "");
+  });
+}
+
+/* Rewrite one line of the editor with a new state, keeping the user's indent and marker */
+function setLineState(text, lineIndex, state){
+  var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+  if (lineIndex < 0 || lineIndex >= lines.length) return text;
+  var p = parseLine(lines[lineIndex]);
+  var indent = new Array(p.indent + 1).join(" ");
+  var marker = p.marker ? p.marker.trim() + " " : "- ";
+  lines[lineIndex] = indent + marker + BOX[state] + (p.text ? " " + p.text : "");
+  return lines.join("\n");
+}
+
+function nextState(s){ return STATES[(STATES.indexOf(s) + 1) % STATES.length]; }
+
+/* Keep only tasks that are not done (and drop children of done tasks) */
+function carryUnfinished(text){
+  var items = parseSection(text);
+  var keep = [], skipBelow = -1;
+  items.forEach(function(it){
+    if (skipBelow >= 0 && it.level > skipBelow) return;
+    skipBelow = -1;
+    if (it.plain) return;
+    if (it.state === "done"){ skipBelow = it.level; return; }
+    keep.push(it);
+  });
+  return formatItems(keep).join("\n");
+}
+
+function buildReport(cfg){
+  var y = parseSection(cfg.yesterday), t = parseSection(cfg.today), o = parseSection(cfg.obstacles);
+  var yl = formatItems(y), tl = formatItems(t), ol = formatItems(o, { noBox: cfg.obstacleBox === false });
+  if (!ol.length) ol = ["- N/A"];
+
+  var text = "# " + (String(cfg.name || "").trim() || "Daily") + " - " + formatDate(cfg.date) + "\n\n";
+  text += "## YESTERDAY\n\n" + (yl.length ? yl.join("\n") + "\n" : "") + "\n";
+  text += "## TODAY\n\n" + (tl.length ? tl.join("\n") + "\n" : "") + "\n";
+  text += "## OBSTACLES\n\n" + ol.join("\n") + "\n";
+
+  var all = y.concat(t, o).filter(function(i){ return !i.plain; });
+  var count = function(s){ return all.filter(function(i){ return i.state === s; }).length; };
+  return {
+    text: text,
+    sections: { yesterday: y, today: t, obstacles: o },
+    open: count("open"), done: count("done"), blocked: count("blocked")
+  };
+}
+/* CORE:END */
+
+/* ---------- DOM ---------- */
+(function(){
+  if (typeof document === "undefined") return;
+
+  var KEY = "daily.personal.v1", HKEY = "daily.personal.history.v1";
+  var $ = function(id){ return document.getElementById(id); };
+  var els = {
+    name: $("name"), date: $("date"),
+    yesterday: $("yesterday"), today: $("today"), obstacles: $("obstacles"),
+    list: $("list"), output: $("output"), warn: $("warn"),
+    cntY: $("cntY"), cntO: $("cntO"),
+    stOpen: $("stOpen"), stDone: $("stDone"), stBlk: $("stBlk"),
+    copy: $("btnCopy"), download: $("btnDownload"), next: $("btnNext"),
+    sample: $("btnSample"), clearToday: $("btnClearToday"),
+    optCarry: $("optCarry"), optKeepObs: $("optKeepObs"), optObsBox: $("optObsBox"),
+    hist: $("hist"), histHint: $("histHint")
+  };
+  var SECTION_TITLES = { yesterday: "Yesterday", today: "Today", obstacles: "Obstacles" };
+  var lastText = "";
+
+  function todayIso(){
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  function esc(s){ return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+  function highlight(md){
+    return md.split("\n").map(function(line){
+      var h = esc(line), codes = [];
+      h = h.replace(/`([^`]+)`/g, function(_, c){ codes.push('<span class="code">' + c + "</span>"); return "\u0000" + (codes.length - 1) + "\u0000"; });
+      h = h.replace(/\*\*([^*]+)\*\*/g, '<span class="b">$1</span>');
+      h = h.replace(/\*\(([^)]*)\)\*/g, '<span class="i">($1)</span>');
+      h = h.replace(/^(\s*[-+] )\[\]/, '$1<span class="box">[]</span>');
+      h = h.replace(/^(\s*[-+] )\[X\]/, '$1<span class="done">[X]</span>');
+      h = h.replace(/^(\s*[-+] )\[!\]/, '$1<span class="blk">[!]</span>');
+      h = h.replace(/^(\s*[-+] (?:<span[^>]*>\[[X!]?\]<\/span> )?)\[([^\]]+)\]/, '$1<span class="tag">[$2]</span>');
+      h = h.replace(/^(- )(N\/A)$/, '$1<span class="na">$2</span>');
+      if (/^## /.test(line)) h = '<span class="h2">' + h + "</span>";
+      else if (/^# /.test(line)) h = '<span class="h1">' + h + "</span>";
+      return h.replace(/\u0000(\d+)\u0000/g, function(_, i){ return codes[+i]; });
+    }).join("\n");
+  }
+
+  function save(){
+    try{
+      localStorage.setItem(KEY, JSON.stringify({
+        name: els.name.value, date: els.date.value,
+        yesterday: els.yesterday.value, today: els.today.value, obstacles: els.obstacles.value,
+        carry: els.optCarry.checked, keepObs: els.optKeepObs.checked, obsBox: els.optObsBox.checked
+      }));
+    } catch(e){}
+  }
+
+  function load(){
+    els.date.value = todayIso();
+    try{
+      var s = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (!s) return;
+      if (s.name) els.name.value = s.name;
+      if (s.date) els.date.value = s.date;
+      els.yesterday.value = s.yesterday || "";
+      els.today.value = s.today || "";
+      els.obstacles.value = s.obstacles || "";
+      if (typeof s.carry === "boolean") els.optCarry.checked = s.carry;
+      if (typeof s.keepObs === "boolean") els.optKeepObs.checked = s.keepObs;
+      if (typeof s.obsBox === "boolean") els.optObsBox.checked = s.obsBox;
+    } catch(e){}
+  }
+
+  function getHistory(){ try{ return JSON.parse(localStorage.getItem(HKEY) || "[]"); } catch(e){ return []; } }
+  function pushHistory(entry){
+    var h = getHistory().filter(function(x){ return x.date !== entry.date; });
+    h.unshift(entry);
+    try{ localStorage.setItem(HKEY, JSON.stringify(h.slice(0, 60))); } catch(e){}
+  }
+
+  function renderHistory(){
+    var h = getHistory();
+    els.histHint.style.display = h.length ? "none" : "";
+    els.hist.innerHTML = h.map(function(x, i){
+      return '<li><span class="d">' + esc(formatDate(x.date)) + '</span>' +
+             '<button class="btn" type="button" data-h="' + i + '" data-act="copy">Copy</button>' +
+             '<button class="btn" type="button" data-h="' + i + '" data-act="dl">.md</button></li>';
+    }).join("");
+  }
+
+  function renderList(sections){
+    var html = "", any = false;
+    ["yesterday", "today", "obstacles"].forEach(function(key){
+      var items = sections[key];
+      if (!items.length) return;
+      any = true;
+      html += '<div class="sec-title">' + SECTION_TITLES[key] + '</div><ul class="rows">';
+      items.forEach(function(it){
+        var cls = "row " + (it.plain ? "plain" : it.state);
+        var label = it.plain ? "" : (it.state === "done" ? "done" : it.state === "blocked" ? "blocked" : "");
+        html += '<li class="' + cls + '" style="padding-left:' + (14 + it.level * 18) + 'px">' +
+          '<button class="tile-btn" type="button" data-sec="' + key + '" data-line="' + it.line + '" data-state="' + it.state + '" aria-label="Change status"><span class="tile"></span></button>' +
+          '<span class="txt">' + (esc(it.text) || "&nbsp;") + "</span>" +
+          '<span class="st">' + label + "</span></li>";
+      });
+      html += "</ul>";
+    });
+    els.list.innerHTML = any ? html : '<div class="empty"><strong>Nothing yet</strong>Type tasks in Yesterday or Today, one per line.<br>Every line becomes <code>- []</code> automatically.</div>';
+  }
+
+  function render(){
+    var res = buildReport({
+      name: els.name.value, date: els.date.value,
+      yesterday: els.yesterday.value, today: els.today.value, obstacles: els.obstacles.value,
+      obstacleBox: els.optObsBox.checked
+    });
+    lastText = res.text;
+    els.output.innerHTML = highlight(res.text);
+    renderList(res.sections);
+
+    els.stOpen.textContent = res.open;
+    els.stDone.textContent = res.done;
+    els.stBlk.textContent = res.blocked;
+    els.cntY.textContent = res.sections.yesterday.length + " task" + (res.sections.yesterday.length === 1 ? "" : "s");
+    els.cntO.textContent = res.sections.obstacles.length ? res.sections.obstacles.length : "N/A";
+
+    if (!els.name.value.trim()){
+      els.warn.className = "warn";
+      els.warn.textContent = "Add your name at the top so the heading reads \u201C# Name - date\u201D.";
+    } else if (!els.today.value.trim() && !els.yesterday.value.trim()){
+      els.warn.className = "warn";
+      els.warn.textContent = "Both lists are empty \u2014 write today\u2019s tasks, one per line.";
+    } else if (res.blocked){
+      els.warn.className = "warn";
+      els.warn.textContent = res.blocked + " blocked task" + (res.blocked > 1 ? "s" : "") + " \u2014 consider noting the reason under Obstacles.";
+    } else {
+      els.warn.className = "warn hidden";
+    }
+    save();
+  }
+
+  /* click a tile -> rewrite that line in its editor */
+  els.list.addEventListener("click", function(e){
+    var btn = e.target.closest(".tile-btn");
+    if (!btn) return;
+    var ta = els[btn.getAttribute("data-sec")];
+    ta.value = setLineState(ta.value, +btn.getAttribute("data-line"), nextState(btn.getAttribute("data-state")));
+    render();
+  });
+
+  els.hist.addEventListener("click", function(e){
+    var b = e.target.closest("button[data-h]");
+    if (!b) return;
+    var x = getHistory()[+b.getAttribute("data-h")];
+    if (!x) return;
+    if (b.getAttribute("data-act") === "copy") copyText(x.text, b);
+    else downloadText(x.text, x.date);
+  });
+
+  /* Tab / Shift+Tab indents; Enter keeps indentation and bullet; Escape releases the field */
+  function handleKeys(e){
+    var ta = e.target;
+    if (e.key === "Escape"){ ta.blur(); return; }
+
+    if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey){
+      var v = ta.value, at = ta.selectionStart;
+      if (at !== ta.selectionEnd) return;
+      var ls = v.lastIndexOf("\n", at - 1) + 1;
+      var m = v.slice(ls, at).match(/^([ \t]*)([-*+][ \t]+(?:\[\s*[xX!]?\s*\][ \t]*)?)?(.*)$/);
+      if (!m) return;
+      var indent = m[1], marker = m[2] || "", rest = m[3];
+      if (marker && !rest.trim()){
+        e.preventDefault();
+        ta.value = v.slice(0, ls) + v.slice(at);
+        ta.selectionStart = ta.selectionEnd = ls;
+        render(); return;
+      }
+      if (!indent && !marker) return;
+      e.preventDefault();
+      var ins = "\n" + indent + (marker ? "- " : "");
+      ta.value = v.slice(0, at) + ins + v.slice(at);
+      ta.selectionStart = ta.selectionEnd = at + ins.length;
+      render(); return;
+    }
+
+    if (e.key !== "Tab") return;
+    e.preventDefault();
+    var val = ta.value, start = ta.selectionStart, end = ta.selectionEnd;
+    var lineStart = val.lastIndexOf("\n", start - 1) + 1;
+    var blockEnd = val.indexOf("\n", end);
+    if (blockEnd === -1) blockEnd = val.length;
+
+    var first = 0, total = 0;
+    var block = val.slice(lineStart, blockEnd).split("\n").map(function(l, i){
+      if (e.shiftKey){
+        var cut = ((l.match(/^ {1,4}/) || [""])[0]).length;
+        if (i === 0) first = cut;
+        total += cut;
+        return l.slice(cut);
+      }
+      if (i === 0) first = 4;
+      total += 4;
+      return "    " + l;
+    }).join("\n");
+
+    var sign = e.shiftKey ? -1 : 1;
+    ta.value = val.slice(0, lineStart) + block + val.slice(blockEnd);
+    ta.selectionStart = Math.max(lineStart, start + sign * first);
+    ta.selectionEnd = Math.max(lineStart, end + sign * total);
+    render();
+  }
+
+  function copyText(text, btn){
+    var done = function(ok){
+      var orig = btn === els.copy ? "Copy" : btn.textContent;
+      btn.textContent = ok ? "Copied \u2713" : "Failed";
+      if (btn === els.copy) btn.className = ok ? "btn ok" : "btn";
+      setTimeout(function(){ btn.textContent = orig; if (btn === els.copy) btn.className = "btn primary"; }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(fallbackCopy(text)); });
+    } else done(fallbackCopy(text));
+  }
+
+  function fallbackCopy(text){
+    try{
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      var ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch(e){ return false; }
+  }
+
+  function downloadText(text, date){
+    var blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = (els.name.value.trim() || "daily") + "-" + date + ".md";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  function startNextDay(){
+    if (!els.today.value.trim() && !els.yesterday.value.trim()) return;
+    if (!confirm("Save today's note to Past days, move TODAY into YESTERDAY and advance the date?")) return;
+    pushHistory({ date: els.date.value, text: lastText });
+    var carried = els.optCarry.checked ? carryUnfinished(els.today.value) : "";
+    els.yesterday.value = formatItems(parseSection(els.today.value)).join("\n");
+    els.today.value = carried;
+    if (!els.optKeepObs.checked) els.obstacles.value = "";
+    els.date.value = addDays(els.date.value, 1);
+    render(); renderHistory();
+    els.today.focus();
+  }
+
+  var SAMPLE_Y = [
+    "- [X] Meet with Tri Nguyen to catch up Sapo Metrics & Zalo OA Low Stock Alert",
+    "    - [X] Test alert flow from making sales on Sapo to receive low stock alert on Zalo OA",
+    "    - [!] Haven't tested a full flow from initializing a new profile with new Sapo store and OA yet",
+    "- Review HexaSync GTM Strategy Documents",
+    "    - Verify research and reports in GG Drive",
+    "        - [X] GTM: Sapo Integration: Sapo Customer Portfolio analysis report",
+    "    - Review GTM Strategy for Low Stock Alert",
+    "        - [X] Global Market",
+    "        - [X] Vietnam Market"
+  ].join("\n");
+  var SAMPLE_T = [
+    "- Finish the end-to-end install test for a new Sapo store + OA",
+    "- Write the GTM summary for Low Stock Alert",
+    "    - Pricing tiers",
+    "    - Launch channels"
+  ].join("\n");
+
+  ["name", "yesterday", "today", "obstacles"].forEach(function(k){ els[k].addEventListener("input", render); });
+  ["date", "optCarry", "optKeepObs", "optObsBox"].forEach(function(k){ els[k].addEventListener("change", render); });
+  [els.yesterday, els.today, els.obstacles].forEach(function(ta){ ta.addEventListener("keydown", handleKeys); });
+
+  els.copy.addEventListener("click", function(){
+    copyText(lastText, els.copy);
+    var panel = $("panelOutput");
+    panel.classList.add("flash");
+    setTimeout(function(){ panel.classList.remove("flash"); }, 700);
+  });
+  els.download.addEventListener("click", function(){ downloadText(lastText, els.date.value); });
+  els.next.addEventListener("click", startNextDay);
+  els.clearToday.addEventListener("click", function(){ els.today.value = ""; render(); els.today.focus(); });
+  els.sample.addEventListener("click", function(){
+    els.yesterday.value = SAMPLE_Y; els.today.value = SAMPLE_T; els.obstacles.value = ""; render();
+  });
+  document.addEventListener("keydown", function(e){
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter"){ e.preventDefault(); copyText(lastText, els.copy); }
+  });
+
+  load();
+  render();
+  renderHistory();
+})();
+
+if (typeof module !== "undefined" && module.exports){
+  module.exports = { buildReport: buildReport, parseSection: parseSection, formatItems: formatItems, setLineState: setLineState, carryUnfinished: carryUnfinished, formatDate: formatDate };
+}
+</script>
+</body>
+</html>
