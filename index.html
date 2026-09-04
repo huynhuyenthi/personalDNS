@@ -441,10 +441,10 @@ function buildReport(cfg){
   var ol = formatItems(o, { noBox: cfg.obstacleBox === false, shortenLarkLinks: true });
   if (!ol.length) ol = ["- N/A"];
 
-  var text = "# " + (String(cfg.name || "").trim() || "Daily") + " - " + formatDate(cfg.date) + "\n\n";
-  text += "## YESTERDAY\n\n" + (yl.length ? yl.join("\n") + "\n" : "") + "\n";
-  text += "## TODAY\n\n" + (tl.length ? tl.join("\n") + "\n" : "") + "\n";
-  text += "## OBSTACLES\n\n" + ol.join("\n") + "\n";
+  var text = "# **" + (String(cfg.name || "").trim() || "Daily") + " - " + formatDate(cfg.date) + "**\n\n";
+  text += "## **YESTERDAY**\n\n" + (yl.length ? yl.join("\n") + "\n" : "") + "\n";
+  text += "## **TODAY**\n\n" + (tl.length ? tl.join("\n") + "\n" : "") + "\n";
+  text += "## **OBSTACLES**\n\n" + ol.join("\n") + "\n";
 
   var all = y.concat(t, o).filter(function(i){ return !i.plain; });
   var count = function(s){ return all.filter(function(i){ return i.state === s; }).length; };
