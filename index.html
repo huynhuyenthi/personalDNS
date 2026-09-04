@@ -49,7 +49,7 @@
   .brand{display:flex; align-items:center; gap:13px; min-width:0}
   .logo{height:29px; width:auto; flex:none; display:block}
   .brand-rule{width:1px; height:36px; background:var(--line); flex:none; margin:0 3px}
-  .brand h1{margin:0; font-family:var(--mono); font-size:17px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; white-space:nowrap}
+  .brand h1{margin:0; font-family:var(--mono); font-size:17px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; white-space:nowrap}
   .brand h1 span{color:var(--sync)}
   .brand p{margin:1px 0 0; font-size:12.5px; color:var(--muted); letter-spacing:.02em}
 
@@ -99,7 +99,7 @@
     padding:12px 14px; border-bottom:1px solid var(--line-soft); background:rgba(0,0,0,.16);
   }
   .panel-head h2{
-    margin:0; font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.18em;
+    margin:0; font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:.18em;
     text-transform:uppercase; color:var(--text-dim); display:flex; align-items:center; gap:9px;
   }
   .panel-head h2::before{content:""; width:9px; height:10px; background:var(--edge); flex:none; clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)}
@@ -118,7 +118,7 @@
   /* ---------- checklist (signature) ---------- */
   .list-wrap{overflow:auto; max-height:640px}
   .sec-title{
-    font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
+    font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.16em; text-transform:uppercase;
     color:var(--muted); padding:12px 14px 4px;
   }
   .rows{list-style:none; margin:0; padding:2px 0 8px}
@@ -183,8 +183,8 @@
   /* ---------- output ---------- */
   .out-wrap{position:relative; max-height:640px; overflow:auto}
   pre#output{margin:0; padding:14px; font-family:var(--mono); font-size:12.5px; line-height:1.75; white-space:pre-wrap; word-break:break-word; color:var(--text-dim)}
-  #output .h1{color:#fff; font-weight:600}
-  #output .h2{color:var(--edge); font-weight:600}
+  #output .h1{color:#fff; font-weight:700}
+  #output .h2{color:var(--edge); font-weight:700}
   #output .box{color:var(--edge)}
   #output .done{color:var(--sync)}
   #output .blk{color:var(--pulse)}
@@ -387,14 +387,23 @@ function parseSection(text){
   return items;
 }
 
+/* In generated output, reduce Lark todo detail links to their suite entity number. */
+function shortenLarkTodoLinks(text){
+  return String(text || "").replace(
+    /https:\/\/applink\.larksuite\.com\/client\/todo\/detail\?[^\s]*?suite_entity_num=(t[^&\s]+)/gi,
+    "$1"
+  );
+}
+
 /* Items -> standard markdown lines: 4 spaces per level, "-" and "+" alternate, every bullet gets a box */
 function formatItems(items, opts){
   opts = opts || {};
   return items.map(function(it){
     var pad = new Array(it.level + 1).join("    ");
     var marker = (it.level % 2 === 0) ? "- " : "+ ";
-    if (it.plain || opts.noBox) return pad + marker + it.text;
-    return pad + marker + BOX[it.state] + (it.text ? " " + it.text : "");
+    var itemText = opts.shortenLarkLinks ? shortenLarkTodoLinks(it.text) : it.text;
+    if (it.plain || opts.noBox) return pad + marker + itemText;
+    return pad + marker + BOX[it.state] + (itemText ? " " + itemText : "");
   });
 }
 
@@ -427,7 +436,9 @@ function carryUnfinished(text){
 
 function buildReport(cfg){
   var y = parseSection(cfg.yesterday), t = parseSection(cfg.today), o = parseSection(cfg.obstacles);
-  var yl = formatItems(y), tl = formatItems(t), ol = formatItems(o, { noBox: cfg.obstacleBox === false });
+  var yl = formatItems(y, { shortenLarkLinks: true });
+  var tl = formatItems(t, { shortenLarkLinks: true });
+  var ol = formatItems(o, { noBox: cfg.obstacleBox === false, shortenLarkLinks: true });
   if (!ol.length) ol = ["- N/A"];
 
   var text = "# " + (String(cfg.name || "").trim() || "Daily") + " - " + formatDate(cfg.date) + "\n\n";
@@ -743,7 +754,7 @@ function buildReport(cfg){
 })();
 
 if (typeof module !== "undefined" && module.exports){
-  module.exports = { buildReport: buildReport, parseSection: parseSection, formatItems: formatItems, setLineState: setLineState, carryUnfinished: carryUnfinished, formatDate: formatDate };
+  module.exports = { buildReport: buildReport, parseSection: parseSection, formatItems: formatItems, setLineState: setLineState, carryUnfinished: carryUnfinished, formatDate: formatDate, shortenLarkTodoLinks: shortenLarkTodoLinks };
 }
 </script>
 </body>
