@@ -186,7 +186,7 @@
   #output.markdown-preview{font-family:var(--mono); font-size:12.5px; line-height:1.75; white-space:pre-wrap}
   .lark-preview{font-family:var(--sans); font-size:14px; line-height:1.55; color:var(--text)}
   .lark-report-title{margin:0 0 24px; color:var(--text); font-size:14px; line-height:1.55; font-weight:700}
-  .lark-section + .lark-section{margin-top:24px}
+  .lark-section + .lark-section{margin-top:0}
   .lark-section h3{margin:0 0 3px; color:var(--text); font-size:14px; line-height:1.55; font-weight:700}
   .lark-line{display:flex; align-items:flex-start; min-width:0; padding:1px 0}
   .lark-bullet{width:16px; flex:none; color:#4F7DFF; font-weight:700; text-align:center}
@@ -399,12 +399,30 @@ function parseSection(text){
   return items;
 }
 
-/* In generated output, reduce Lark todo detail links to their suite entity number. */
+/* Move shortened Lark todo references to parentheses at the end of the task. */
 function shortenLarkTodoLinks(text){
-  return String(text || "").replace(
-    /https:\/\/applink\.larksuite\.com\/client\/todo\/detail\?[^\s]*?suite_entity_num=(t[^&\s]+)/gi,
-    "$1"
+  var ids = [];
+  var cleaned = String(text || "").replace(
+    /https:\/\/applink\.larksuite\.com\/client\/todo\/detail\?[^\s]*?suite_entity_num=(t[0-9A-Za-z_-]+)(?:&[^\s]*)?/gi,
+    function(_, id){
+      if (ids.indexOf(id) === -1) ids.push(id);
+      return "";
+    }
   );
+  if (!ids.length) return cleaned;
+  cleaned = cleaned
+    .replace(/\(\s*\)/g, "")
+    .replace(/[ \t]+([,.;:!?])/g, "$1")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]*[-\u2013\u2014|:;,][ \t]*$/, "")
+    .trim();
+  var punctuation = "";
+  var end = cleaned.match(/([.!?])$/);
+  if (end){
+    punctuation = end[1];
+    cleaned = cleaned.slice(0, -1).trim();
+  }
+  return cleaned + (cleaned ? " " : "") + "(" + ids.join(", ") + ")" + punctuation;
 }
 
 /* Items -> output lines. Lark uses 2 spaces and "-" at every level; Markdown keeps the existing style. */
@@ -459,9 +477,9 @@ function buildReport(cfg){
   var text;
   if (isLark){
     text = "**" + (String(cfg.name || "").trim() || "Daily") + " - " + formatDate(cfg.date) + "**\n\n";
-    text += "**YESTERDAY**\n\n" + (yl.length ? yl.join("\n") + "\n" : "") + "\n";
-    text += "**TODAY**\n\n" + (tl.length ? tl.join("\n") + "\n" : "") + "\n";
-    text += "**OBSTACLES**\n\n" + ol.join("\n") + "\n";
+    text += "**YESTERDAY**\n" + (yl.length ? yl.join("\n") + "\n" : "");
+    text += "**TODAY**\n" + (tl.length ? tl.join("\n") + "\n" : "");
+    text += "**OBSTACLES**\n" + ol.join("\n") + "\n";
   } else {
     text = "# **" + (String(cfg.name || "").trim() || "Daily") + " - " + formatDate(cfg.date) + "**\n\n";
     text += "## **YESTERDAY**\n\n" + (yl.length ? yl.join("\n") + "\n" : "") + "\n";
@@ -572,7 +590,6 @@ function buildReport(cfg){
       if (!items.length && key === "obstacles") items = [{ level:0, state:"open", text:"N/A", plain:true }];
       html += '<div><strong>' + SECTION_TITLES[key].toUpperCase() + '</strong></div>';
       html += larkListHtml(items);
-      if (key !== "obstacles") html += '<br>';
     });
     return '<div style="font-family:Arial,sans-serif">' + html + '</div>';
   }
