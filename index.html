@@ -185,6 +185,7 @@
   #output{margin:0; padding:14px; min-height:100%; word-break:break-word; color:var(--text-dim)}
   #output.markdown-preview{font-family:var(--mono); font-size:12.5px; line-height:1.75; white-space:pre-wrap}
   .lark-preview{font-family:var(--sans); font-size:14px; line-height:1.55; color:var(--text)}
+  .lark-report-title{margin:0 0 24px; color:var(--text); font-size:14px; line-height:1.55; font-weight:700}
   .lark-section + .lark-section{margin-top:24px}
   .lark-section h3{margin:0 0 3px; color:var(--text); font-size:14px; line-height:1.55; font-weight:700}
   .lark-line{display:flex; align-items:flex-start; min-width:0; padding:1px 0}
@@ -457,7 +458,8 @@ function buildReport(cfg){
 
   var text;
   if (isLark){
-    text = "**YESTERDAY**\n\n" + (yl.length ? yl.join("\n") + "\n" : "") + "\n";
+    text = "**" + (String(cfg.name || "").trim() || "Daily") + " - " + formatDate(cfg.date) + "**\n\n";
+    text += "**YESTERDAY**\n\n" + (yl.length ? yl.join("\n") + "\n" : "") + "\n";
     text += "**TODAY**\n\n" + (tl.length ? tl.join("\n") + "\n" : "") + "\n";
     text += "**OBSTACLES**\n\n" + ol.join("\n") + "\n";
   } else {
@@ -495,7 +497,7 @@ function buildReport(cfg){
     hist: $("hist"), histHint: $("histHint")
   };
   var SECTION_TITLES = { yesterday: "Yesterday", today: "Today", obstacles: "Obstacles" };
-  var lastText = "", outputFormat = "lark";
+  var lastText = "", lastSections = null, outputFormat = "lark";
 
   function todayIso(){
     var d = new Date();
@@ -521,9 +523,10 @@ function buildReport(cfg){
     }).join("\n");
   }
 
-  function renderLarkPreview(sections){
+  function renderLarkPreview(sections, name, date){
     var order = ["yesterday", "today", "obstacles"];
-    return '<div class="lark-preview">' + order.map(function(key){
+    var title = esc(String(name || "").trim() || "Daily") + " - " + esc(formatDate(date));
+    return '<div class="lark-preview"><div class="lark-report-title">' + title + '</div>' + order.map(function(key){
       var items = sections[key];
       if (!items.length && key === "obstacles") items = [{ level:0, state:"open", text:"N/A", plain:true }];
       var lines = items.map(function(it){
@@ -536,6 +539,42 @@ function buildReport(cfg){
       }).join("");
       return '<section class="lark-section"><h3>' + SECTION_TITLES[key].toUpperCase() + '</h3>' + lines + '</section>';
     }).join("") + '</div>';
+  }
+
+  /* Semantic nested lists survive rich-text paste into Lark better than visual padding. */
+  function larkListHtml(items){
+    if (!items.length) return "";
+    var index = 0;
+    function renderLevel(level){
+      var html = '<ul style="margin:0;padding-left:24px;">';
+      while (index < items.length && items[index].level >= level){
+        if (items[index].level > level){
+          html += renderLevel(level + 1);
+          continue;
+        }
+        var it = items[index++];
+        var mark = it.plain ? "" : (it.state === "done" ? "[X]" : it.state === "blocked" ? "[!]" : "[ ]");
+        html += '<li>' + (mark ? mark + '&nbsp;' : '') + esc(shortenLarkTodoLinks(it.text));
+        if (index < items.length && items[index].level > level) html += renderLevel(level + 1);
+        html += '</li>';
+      }
+      return html + '</ul>';
+    }
+    return renderLevel(0);
+  }
+
+  function buildLarkClipboardHtml(sections, name, date){
+    var order = ["yesterday", "today", "obstacles"];
+    var title = esc(String(name || "").trim() || "Daily") + " - " + esc(formatDate(date));
+    var html = '<div><strong>' + title + '</strong></div><br>';
+    order.forEach(function(key){
+      var items = sections[key];
+      if (!items.length && key === "obstacles") items = [{ level:0, state:"open", text:"N/A", plain:true }];
+      html += '<div><strong>' + SECTION_TITLES[key].toUpperCase() + '</strong></div>';
+      html += larkListHtml(items);
+      if (key !== "obstacles") html += '<br>';
+    });
+    return '<div style="font-family:Arial,sans-serif">' + html + '</div>';
   }
 
   function save(){
@@ -609,9 +648,10 @@ function buildReport(cfg){
       obstacleBox: els.optObsBox.checked, format: outputFormat
     });
     lastText = res.text;
+    lastSections = res.sections;
     if (outputFormat === "lark"){
       els.output.className = "lark-output";
-      els.output.innerHTML = renderLarkPreview(res.sections);
+      els.output.innerHTML = renderLarkPreview(res.sections, els.name.value, els.date.value);
       els.copy.className = "btn primary";
       els.copy.textContent = "Copy Lark";
     } else {
@@ -743,9 +783,8 @@ function buildReport(cfg){
       copyText(lastText, els.copy);
       return;
     }
-    var preview = els.output.querySelector(".lark-preview");
-    if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== "undefined" && preview){
-      var html = '<div style="font-family:Arial,sans-serif">' + preview.innerHTML + '</div>';
+    if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== "undefined" && lastSections){
+      var html = buildLarkClipboardHtml(lastSections, els.name.value, els.date.value);
       var item = new ClipboardItem({
         "text/html": new Blob([html], { type:"text/html" }),
         "text/plain": new Blob([lastText], { type:"text/plain" })
