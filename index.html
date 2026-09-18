@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Daily · Personal note</title>
-<meta name="description" content="Write your own daily note, tick tasks done or blocked, and copy one standard markdown block." />
+<meta name="description" content="Write your daily note, track task status, and copy it in Lark Suite or Markdown format." />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -234,7 +234,7 @@
       <span class="brand-rule" aria-hidden="true"></span>
       <div>
         <h1>Daily <span>· Personal</span></h1>
-        <p>Write your note, tick what&rsquo;s done or blocked, copy one markdown block.</p>
+        <p>Write your note, tick what&rsquo;s done or blocked, then copy it for Lark Suite or Markdown.</p>
       </div>
     </div>
 
@@ -322,6 +322,7 @@
       <div class="panel-head">
         <h2>Standard output</h2>
         <div class="btn-row">
+          <button class="btn accent" id="btnFormat" type="button" title="Switch output to Markdown">Markdown</button>
           <button class="btn" id="btnDownload" type="button">Download .md</button>
           <button class="btn primary" id="btnCopy" type="button">Copy</button>
         </div>
@@ -395,12 +396,13 @@ function shortenLarkTodoLinks(text){
   );
 }
 
-/* Items -> standard markdown lines: 4 spaces per level, "-" and "+" alternate, every bullet gets a box */
+/* Items -> output lines. Lark uses 2 spaces and "-" at every level; Markdown keeps the existing style. */
 function formatItems(items, opts){
   opts = opts || {};
   return items.map(function(it){
-    var pad = new Array(it.level + 1).join("    ");
-    var marker = (it.level % 2 === 0) ? "- " : "+ ";
+    var indent = typeof opts.indentSize === "number" ? opts.indentSize : 4;
+    var pad = new Array(it.level * indent + 1).join(" ");
+    var marker = opts.singleMarker ? "- " : ((it.level % 2 === 0) ? "- " : "+ ");
     var itemText = opts.shortenLarkLinks ? shortenLarkTodoLinks(it.text) : it.text;
     if (it.plain || opts.noBox) return pad + marker + itemText;
     return pad + marker + BOX[it.state] + (itemText ? " " + itemText : "");
@@ -436,15 +438,24 @@ function carryUnfinished(text){
 
 function buildReport(cfg){
   var y = parseSection(cfg.yesterday), t = parseSection(cfg.today), o = parseSection(cfg.obstacles);
-  var yl = formatItems(y, { shortenLarkLinks: true });
-  var tl = formatItems(t, { shortenLarkLinks: true });
-  var ol = formatItems(o, { noBox: cfg.obstacleBox === false, shortenLarkLinks: true });
+  var isLark = cfg.format !== "markdown";
+  var outputOpts = { shortenLarkLinks: true, indentSize: isLark ? 2 : 4, singleMarker: isLark };
+  var yl = formatItems(y, outputOpts);
+  var tl = formatItems(t, outputOpts);
+  var ol = formatItems(o, { noBox: cfg.obstacleBox === false, shortenLarkLinks: true, indentSize: isLark ? 2 : 4, singleMarker: isLark });
   if (!ol.length) ol = ["- N/A"];
 
-  var text = "# **" + (String(cfg.name || "").trim() || "Daily") + " - " + formatDate(cfg.date) + "**\n\n";
-  text += "## **YESTERDAY**\n\n" + (yl.length ? yl.join("\n") + "\n" : "") + "\n";
-  text += "## **TODAY**\n\n" + (tl.length ? tl.join("\n") + "\n" : "") + "\n";
-  text += "## **OBSTACLES**\n\n" + ol.join("\n") + "\n";
+  var text;
+  if (isLark){
+    text = "**YESTERDAY**\n\n" + (yl.length ? yl.join("\n") + "\n" : "") + "\n";
+    text += "**TODAY**\n\n" + (tl.length ? tl.join("\n") + "\n" : "") + "\n";
+    text += "**OBSTACLES**\n\n" + ol.join("\n") + "\n";
+  } else {
+    text = "# **" + (String(cfg.name || "").trim() || "Daily") + " - " + formatDate(cfg.date) + "**\n\n";
+    text += "## **YESTERDAY**\n\n" + (yl.length ? yl.join("\n") + "\n" : "") + "\n";
+    text += "## **TODAY**\n\n" + (tl.length ? tl.join("\n") + "\n" : "") + "\n";
+    text += "## **OBSTACLES**\n\n" + ol.join("\n") + "\n";
+  }
 
   var all = y.concat(t, o).filter(function(i){ return !i.plain; });
   var count = function(s){ return all.filter(function(i){ return i.state === s; }).length; };
@@ -468,13 +479,13 @@ function buildReport(cfg){
     list: $("list"), output: $("output"), warn: $("warn"),
     cntY: $("cntY"), cntO: $("cntO"),
     stOpen: $("stOpen"), stDone: $("stDone"), stBlk: $("stBlk"),
-    copy: $("btnCopy"), download: $("btnDownload"), next: $("btnNext"),
+    copy: $("btnCopy"), download: $("btnDownload"), format: $("btnFormat"), next: $("btnNext"),
     sample: $("btnSample"), clearToday: $("btnClearToday"),
     optCarry: $("optCarry"), optKeepObs: $("optKeepObs"), optObsBox: $("optObsBox"),
     hist: $("hist"), histHint: $("histHint")
   };
   var SECTION_TITLES = { yesterday: "Yesterday", today: "Today", obstacles: "Obstacles" };
-  var lastText = "";
+  var lastText = "", outputFormat = "lark";
 
   function todayIso(){
     var d = new Date();
@@ -505,7 +516,8 @@ function buildReport(cfg){
       localStorage.setItem(KEY, JSON.stringify({
         name: els.name.value, date: els.date.value,
         yesterday: els.yesterday.value, today: els.today.value, obstacles: els.obstacles.value,
-        carry: els.optCarry.checked, keepObs: els.optKeepObs.checked, obsBox: els.optObsBox.checked
+        carry: els.optCarry.checked, keepObs: els.optKeepObs.checked, obsBox: els.optObsBox.checked,
+        outputFormat: outputFormat
       }));
     } catch(e){}
   }
@@ -523,6 +535,7 @@ function buildReport(cfg){
       if (typeof s.carry === "boolean") els.optCarry.checked = s.carry;
       if (typeof s.keepObs === "boolean") els.optKeepObs.checked = s.keepObs;
       if (typeof s.obsBox === "boolean") els.optObsBox.checked = s.obsBox;
+      if (s.outputFormat === "markdown" || s.outputFormat === "lark") outputFormat = s.outputFormat;
     } catch(e){}
   }
 
@@ -567,10 +580,12 @@ function buildReport(cfg){
     var res = buildReport({
       name: els.name.value, date: els.date.value,
       yesterday: els.yesterday.value, today: els.today.value, obstacles: els.obstacles.value,
-      obstacleBox: els.optObsBox.checked
+      obstacleBox: els.optObsBox.checked, format: outputFormat
     });
     lastText = res.text;
     els.output.innerHTML = highlight(res.text);
+    els.format.textContent = outputFormat === "lark" ? "Markdown" : "Lark Suite";
+    els.format.title = outputFormat === "lark" ? "Switch output to Markdown" : "Switch output to Lark Suite";
     renderList(res.sections);
 
     els.stOpen.textContent = res.open;
@@ -579,7 +594,7 @@ function buildReport(cfg){
     els.cntY.textContent = res.sections.yesterday.length + " task" + (res.sections.yesterday.length === 1 ? "" : "s");
     els.cntO.textContent = res.sections.obstacles.length ? res.sections.obstacles.length : "N/A";
 
-    if (!els.name.value.trim()){
+    if (outputFormat === "markdown" && !els.name.value.trim()){
       els.warn.className = "warn";
       els.warn.textContent = "Add your name at the top so the heading reads \u201C# Name - date\u201D.";
     } else if (!els.today.value.trim() && !els.yesterday.value.trim()){
@@ -739,6 +754,10 @@ function buildReport(cfg){
     setTimeout(function(){ panel.classList.remove("flash"); }, 700);
   });
   els.download.addEventListener("click", function(){ downloadText(lastText, els.date.value); });
+  els.format.addEventListener("click", function(){
+    outputFormat = outputFormat === "lark" ? "markdown" : "lark";
+    render();
+  });
   els.next.addEventListener("click", startNextDay);
   els.clearToday.addEventListener("click", function(){ els.today.value = ""; render(); els.today.focus(); });
   els.sample.addEventListener("click", function(){
